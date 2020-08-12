@@ -41,12 +41,19 @@ public class CustomServer {
                         @Override
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             socketChannel.pipeline()
+                                    //消息头定长
                                     .addLast(new ProtobufVarint32FrameDecoder())
+                                    //解码指定的消息类型
                                     .addLast(new ProtobufDecoder(CustomMessageData.MessageData.getDefaultInstance()))
+                                    //消息头设置长度
                                     .addLast(new ProtobufVarint32LengthFieldPrepender())
+                                    //解码
                                     .addLast(new ProtobufEncoder())
+                                    //心跳检测，超过设置的时间将会抛出异常ReadTimeoutException
                                     .addLast(new ReadTimeoutHandler(8))
+                                    //消息处理
                                     .addLast(new CustomServerHandler())
+                                    //心跳响应
                                     .addLast(new CustomServerHeartBeatHandler());
                         }
                     });

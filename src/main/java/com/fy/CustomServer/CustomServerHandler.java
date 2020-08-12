@@ -55,7 +55,7 @@ public class CustomServerHandler extends ChannelInboundHandlerAdapter {
         }
 
         if (messageData.getOrder() == CustomMessageData.MessageData.DataType.REQ_LOGIN) {
-            // 检查白名单
+            // 检查重复登录
             String nodeIndex = ctx.channel().remoteAddress().toString();
             if (nodeCheck.contains(nodeIndex)) {
                 // 重复登录
@@ -65,12 +65,14 @@ public class CustomServerHandler extends ChannelInboundHandlerAdapter {
                 InetSocketAddress socketAddress = (InetSocketAddress) ctx.channel().remoteAddress();
                 String ip = socketAddress.getAddress().getHostAddress();
                 boolean isOk = false;
+                // 检查白名单
                 for (String s : whiteIPv4List) {
                     if (s.equals(ip)) {
                         isOk = true;
                         break;
                     }
                 }
+                // 成功响应
                 CustomMessageData.MessageData responseData = isOk ? builderResp(true) : builderResp(false);
                 if (isOk) {
                     nodeCheck.put(nodeIndex, true);
@@ -78,6 +80,7 @@ public class CustomServerHandler extends ChannelInboundHandlerAdapter {
                 ctx.writeAndFlush(responseData);
             }
         } else {
+            //心跳消息处理
             ctx.fireChannelRead(msg);
         }
     }
