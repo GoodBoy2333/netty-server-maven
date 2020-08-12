@@ -341,3 +341,8 @@ state: 1
 ```
 
 可以看到服务端收到消息后修改状态字段并返回成功啦。
+
+附：
+fileServer：文件服务器，基于http协议
+messagePack：基于messagePack序列化消息传输
+webSocketServer：webSocket服务
