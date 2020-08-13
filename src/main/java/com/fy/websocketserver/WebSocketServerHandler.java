@@ -22,7 +22,18 @@ import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
  * @since 2020/8/10 15:37
  */
 public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> {
+
+    // 服务器端Web套接字打开和关闭握手基类
+
     WebSocketServerHandshaker handshaker;
+
+    //webSocket默认端口：8080
+
+    int port;
+
+    public WebSocketServerHandler(int port) {
+        this.port = port;
+    }
 
     /**
      * channel 通道 action 活跃的 当客户端主动链接服务端的链接后，这个通道就是活跃的了。也就是客户端与服务端建立了通信通道并且可以传输数据
@@ -47,8 +58,10 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     @Override
     protected void channelRead0(ChannelHandlerContext channelHandlerContext, Object o) throws Exception {
         if (o instanceof FullHttpRequest) {
+            // 处理http消息（升级协议）
             handlerHttpRequest(channelHandlerContext, (FullHttpRequest) o);
         } else if (o instanceof WebSocketFrame) {
+            // 处理websocket消息
             handlerWebSocketFrame(channelHandlerContext, (WebSocketFrame) o);
         }
     }
@@ -59,22 +72,23 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
     }
 
     private void handlerHttpRequest(ChannelHandlerContext ctx, FullHttpRequest req) {
+        // 如果不是升级协议消息
         if (!req.getDecoderResult().isSuccess() || !"websocket".equals(req.headers().get("Upgrade"))) {
             sendError(ctx, req, new DefaultFullHttpResponse(HTTP_1_1, BAD_REQUEST));
             return;
         }
-        // 设置参数
-        ctx.attr(AttributeKey.valueOf("type")).set(ctx.channel().id());
+        // 设置连接参数
+        ctx.attr(AttributeKey.valueOf("channelId")).set(ctx.channel().id());
         System.out.println(ctx.channel().remoteAddress().toString() + "----" + ctx.channel().id());
 
-        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory(
-                "ws://localhost:8080/websocket",
-                null,
-                false);
+        //websocket协议开头为：ws+ip+端口
+        WebSocketServerHandshakerFactory wsFactory = new WebSocketServerHandshakerFactory("ws://localhost:" + this.port, null, false);
         handshaker = wsFactory.newHandshaker(req);
         if (wsFactory == null) {
+            //返回不支持websocket 版本
             WebSocketServerHandshakerFactory.sendUnsupportedVersionResponse(ctx.channel());
         } else {
+            //开始握手
             handshaker.handshake(ctx.channel(), req);
         }
     }
@@ -95,10 +109,11 @@ public class WebSocketServerHandler extends SimpleChannelInboundHandler<Object> 
             throw new UnsupportedOperationException(String.format("%s frame not support", frame.getClass().getName()));
         }
         String text = ((TextWebSocketFrame) frame).text();
-        System.out.println(String.format("Client:%s,type:%s", text, ctx.attr(AttributeKey.valueOf("type")).get()));
+        System.out.println(String.format("Client:%s,channelId:%s", text, ctx.attr(AttributeKey.valueOf("channelId")).get()));
 
         TextWebSocketFrame tws = new TextWebSocketFrame(String.format("服务器收到消息:%s,通道id:%s,当前时间:%s", text, ctx.channel().id(), LocalDateTime.now()));
         if (text.startsWith("$")) {
+            //已$开头的单独回复
             ctx.channel().write(tws);
         } else {
             //群发

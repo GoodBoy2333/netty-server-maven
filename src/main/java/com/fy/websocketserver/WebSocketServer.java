@@ -42,7 +42,7 @@ public class WebSocketServer {
                                     .addLast(new HttpObjectAggregator(65536))
                                     //向客户端发送html5文件，它主要用于支持浏览器和服务端进行WebSocket通信
                                     .addLast(new ChunkedWriteHandler())
-                                    .addLast(new WebSocketServerHandler());
+                                    .addLast(new WebSocketServerHandler(port));
                         }
                     });
             Channel channel = bootstrap.bind(port).sync().channel();
