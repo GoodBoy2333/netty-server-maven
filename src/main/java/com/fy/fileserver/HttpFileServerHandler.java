@@ -37,6 +37,8 @@ import java.util.regex.Pattern;
  */
 public class HttpFileServerHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 
+    // 这里继承的是SimpleChannelInboundHandler，指定处理消息类型
+
     private final String url;
 
     public HttpFileServerHandler(String url) {
@@ -45,15 +47,18 @@ public class HttpFileServerHandler extends SimpleChannelInboundHandler<FullHttpR
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request) throws Exception {
+        // 判断消息解码是否成功
         if (!request.getDecoderResult().isSuccess()) {
             sendError(ctx, BAD_REQUEST);
             return;
         }
+        // 判断消息类型
         if (request.getMethod() != GET) {
             sendError(ctx, METHOD_NOT_ALLOWED);
             return;
         }
         final String uri = request.getUri();
+        // 路径的处理与安全过滤
         final String path = sanitizeUri(uri);
         if (path == null) {
             sendError(ctx, FORBIDDEN);
@@ -64,6 +69,7 @@ public class HttpFileServerHandler extends SimpleChannelInboundHandler<FullHttpR
             sendError(ctx, NOT_FOUND);
             return;
         }
+        // 如果是目录则展示文件列表
         if (file.isDirectory()) {
             if (uri.endsWith("/")) {
                 sendListing(ctx, file);
@@ -85,16 +91,18 @@ public class HttpFileServerHandler extends SimpleChannelInboundHandler<FullHttpR
             return;
         }
         long fileLength = randomAccessFile.length();
+        //http响应
         HttpResponse response = new DefaultHttpResponse(HTTP_1_1, OK);
-        setContentLength(response, fileLength);
+        //设置消息长度
+        HttpUtil.setContentLength(response, fileLength);
+        //设置消息类型
         setContentTypeHeader(response, file);
-        if (isKeepAlive(request)) {
-            response.headers().set(CONNECTION, HttpHeaders.Values.KEEP_ALIVE);
+        if (HttpUtil.isKeepAlive(request)) {
+            HttpUtil.setKeepAlive(response, true);
         }
         ctx.write(response);
         ChannelFuture sendFileFuture;
-        sendFileFuture = ctx.write(new ChunkedFile(randomAccessFile, 0,
-                fileLength, 8192), ctx.newProgressivePromise());
+        sendFileFuture = ctx.write(new ChunkedFile(randomAccessFile, 0, fileLength, 8192), ctx.newProgressivePromise());
         sendFileFuture.addListener(new ChannelProgressiveFutureListener() {
             @Override
             public void operationProgressed(ChannelProgressiveFuture future, long progress, long total) {
@@ -111,8 +119,9 @@ public class HttpFileServerHandler extends SimpleChannelInboundHandler<FullHttpR
                 System.out.println("Transfer complete.");
             }
         });
+        // http消息结束标记
         ChannelFuture lastContentFuture = ctx.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
-        if (!isKeepAlive(request)) {
+        if (!HttpUtil.isKeepAlive(request)) {
             lastContentFuture.addListener(ChannelFutureListener.CLOSE);
         }
     }
